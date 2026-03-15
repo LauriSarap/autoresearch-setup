@@ -272,8 +272,9 @@ Examples of unreasonable experiments:
 
 LOOP FOREVER:
 
-1. Inspect current git branch and current best result.
+1. Inspect current best result.
 2. Choose one promising experiment.
+2a. Create a new branch for this experiment (`exp/<experiment-name>`) from the current best state.
 3. Edit only the allowed files.
 4. Commit the experiment with a short message.
 5. Run the experiment with output redirected to a log file:
@@ -297,8 +298,9 @@ LOOP FOREVER:
 
 FOR EACH setting IN the settings grid:
 
-1. Configure the pipeline for this setting.
-2. Commit configuration changes.
+1. Create a new branch for this setting (`exp/<setting-name>`) from the current state.
+2. Configure the pipeline for this setting.
+3. Commit configuration changes.
 3. Run the experiment.
 4. Extract metrics.
 5. Record in `autoexp_results.tsv` with the `setting` column filled.
@@ -310,8 +312,9 @@ FOR EACH setting IN the settings grid:
 
 FOR EACH claim IN the claims list:
 
-1. Configure the pipeline to match the paper's setup for this claim.
-2. Run the experiment.
+1. Create a new branch for this claim (`exp/reproduce-<claim-ref>`) from the current state.
+2. Configure the pipeline to match the paper's setup for this claim.
+3. Run the experiment.
 3. Extract the relevant metric.
 4. Compare to the expected value from the paper.
 5. Record in `autoexp_results.tsv` with `reference`, `expected`, `actual` columns.
@@ -321,7 +324,8 @@ FOR EACH claim IN the claims list:
 ### For modification goals (D, E)
 
 1. Present the proposed modification to the user before implementing.
-2. Implement the modification in a separate commit from any runs.
+2. Create a new branch for this modification (`exp/<modification-name>`) from the current state.
+3. Implement the modification in a separate commit from any runs.
 3. Run baseline (original methodology) for comparison.
 4. Run modified experiment.
 5. Record both results.
@@ -347,14 +351,19 @@ Crash handling:
 
 ## Branching and reproducibility
 
-Recommended branch naming:
-- `autoexp/<date-or-tag>`
+Each distinct experiment type or goal must run on its own branch. Create the branch before the first run and do all work for that experiment on it.
 
-For each run:
-- keep code changes committed
-- avoid mixing unrelated experiments
-- preserve the best known state
-- avoid untracked modifications except logs/artifacts explicitly allowed
+Branch naming:
+- `exp/<goal-short-name>` — e.g. `exp/lr-sweep`, `exp/extend-llama-models`, `exp/reproduce-table2`
+- If multiple experiments share the same goal type but test different ideas, use sub-branches: `exp/opt-lr`, `exp/opt-batch-size`, etc.
+
+Rules:
+- Create a new branch from the current best state (usually `main`) before starting a new experiment
+- Keep all commits for that experiment on its branch
+- Do not mix unrelated experiments on the same branch
+- Preserve the best known state on each branch
+- Avoid untracked modifications except logs/artifacts explicitly allowed
+- When an optimization experiment is `keep`, its branch becomes the new best state — merge it back or branch from it for the next experiment
 
 ## Final instruction to the agent
 
