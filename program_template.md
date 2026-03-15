@@ -155,9 +155,10 @@ Write the report as a concise research-style experiment overview. Use this struc
 
 ```latex
 \documentclass{article}
-\usepackage{booktabs, graphicx, hyperref, amsmath}
+\usepackage{booktabs, graphicx, hyperref, amsmath, pgfplots}
+\pgfplotsset{compat=1.18}
 \title{AutoExp Report: <goal description>}
-\author{AutoExp}
+\author{<GitHub username> \and <agent/model name, e.g. Claude Opus 4.6, GPT-4o, Codex>}
 \date{\today}
 \begin{document}
 \maketitle
@@ -175,11 +176,19 @@ Write the report as a concise research-style experiment overview. Use this struc
 % For extension: show results across all settings.
 % For reproduction: show expected vs actual with match/mismatch.
 % For modification: show baseline vs modified side by side.
+%
+% REQUIRED: Include at least one visual (chart/plot) of the results using pgfplots.
+% Examples:
+%   - Optimization: line plot of primary metric over experiments, bar chart comparing top runs.
+%   - Extension: grouped bar chart across settings.
+%   - Reproduction: bar chart of expected vs actual values.
+%   - Modification: side-by-side comparison chart.
 
 \section{Analysis}
 % What worked, what didn't, notable patterns or anomalies.
 % For optimization: which knobs had the most impact.
 % For reproduction: explain any mismatches.
+% Reference the visuals from the Results section in your analysis.
 
 \section{Conclusion}
 % Summary of outcome relative to the goal.
@@ -196,7 +205,7 @@ pdflatex -interaction=nonstopmode autoexp_report.tex
 
 If `pdflatex` is not available, leave the `.tex` file for the user and note that compilation was skipped.
 
-If the report includes figures or plots, prefer `pgfplots` or inline `tabular` environments over external image files.
+The report **must** include visual charts/plots of the results using `pgfplots` (inline in the `.tex` file). Do not rely on external image files. Every report should have at least one figure visualizing the key results alongside the data tables.
 
 ## Search space
 
