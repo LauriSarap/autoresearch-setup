@@ -52,10 +52,18 @@ Primary output / evaluation path:
 Artifacts and logs to inspect:
 - `<stdout / log file / tensorboard / wandb / checkpoints / metrics json / csv>`
 
+Experiment workspace:
+- use `exp/<experiment-name>/` for each new idea or setting
+- copy or replicate only the scripts/config folders needed to run that idea
+- keep baseline/canonical repo files unchanged until an experiment has clearly won
+- run each experiment from its own `exp/...` workspace or with explicit paths to that workspace
+- use Git commits only as provenance for the canonical state; do not create Git branches unless the user explicitly asks for branch-based experiments
+
 ## What can be modified
 
 The agent may modify:
-- `<list specific files and what can change in them>`
+- `<list specific canonical files and what can change in them after promotion>`
+- `exp/<experiment-name>/...` copies of scripts/configs needed for isolated experiments
 
 ## What cannot be modified
 
@@ -112,21 +120,23 @@ Log every experiment to:
 Use tab-separated format with this header:
 
 ```text
-commit	primary_metric	status	description	runtime_sec	peak_vram_mb	notes
+experiment_id	experiment_path	base_state	primary_metric	status	description	runtime_sec	peak_vram_mb	notes
 ```
 
 For **extension** goals, add a `setting` column:
 ```text
-commit	setting	primary_metric	status	description	runtime_sec	peak_vram_mb	notes
+experiment_id	experiment_path	setting	base_state	primary_metric	status	description	runtime_sec	peak_vram_mb	notes
 ```
 
 For **reproduction** goals, add a `reference` column:
 ```text
-commit	reference	expected	actual	status	description	runtime_sec	notes
+experiment_id	experiment_path	base_state	reference	expected	actual	status	description	runtime_sec	notes
 ```
 
 Definitions:
-- `commit`: short git commit hash for the experiment
+- `experiment_id`: short stable name, usually matching the `exp/<experiment-name>` folder
+- `experiment_path`: path to the isolated experiment workspace, e.g. `exp/lr-sweep`
+- `base_state`: short git commit hash or `working-tree` identifier for the canonical files copied into the experiment
 - `primary_metric`: numeric value, or `NA` if unavailable
 - `status`: `keep`, `discard`, `crash`, `timeout`, `oom`, `nan`, or for reproduction: `match`, `mismatch`
 - `description`: short description of the idea tested
@@ -139,6 +149,20 @@ Definitions:
 - `notes`: brief reason for keep/discard/crash, or explanation of mismatch
 
 Do not commit `autoexp_results.tsv` unless the repo explicitly wants experiment logs tracked.
+
+## Promoting winning experiments
+
+When an isolated experiment beats the current best result and satisfies all constraints:
+1. compare its `exp/<experiment-name>/` files against the canonical source files they were copied from
+2. identify the minimal set of changes responsible for the improvement
+3. apply only those changes back to the canonical repo files
+4. rerun the canonical entrypoint outside `exp/...` to verify the improvement survives promotion
+5. mark the experiment `keep` only after the promoted canonical run passes
+
+If multiple isolated experiments win independently, merge them deliberately:
+- combine one idea at a time into the canonical files
+- rerun after each merge
+- if two ideas interact badly, keep the stronger one and record the failed combination in `autoexp_results.tsv`
 
 ## Experiment report
 
@@ -261,9 +285,9 @@ Known repo-specific traps:
 - Prefer changes that are easy to reason about
 - Prefer improvements that hold under the fixed evaluation protocol
 - Prefer simplifications when performance is equal
-- Revert failed or non-improving experiments (for optimization goals)
+- Leave failed or non-improving experiments isolated in `exp/...` and keep canonical files unchanged
 - Record all results even for failed runs (for extension/reproduction goals)
-- Keep good changes and advance from the best known commit
+- Keep good changes by promoting them into the canonical files and advance from the best known canonical state
 - Avoid large speculative rewrites unless smaller changes are exhausted
 
 Examples of reasonable experiments:
@@ -283,11 +307,12 @@ LOOP FOREVER:
 
 1. Inspect current best result.
 2. Choose one promising experiment.
-2a. Create a new branch for this experiment (`exp/<experiment-name>`) from the current best state.
-3. Edit only the allowed files.
-4. Commit the experiment with a short message.
+2a. Create an isolated experiment workspace at `exp/<experiment-name>/`.
+2b. Copy the relevant scripts/config folders from the current best canonical state into that workspace.
+3. Edit only the copied files inside `exp/<experiment-name>/`.
+4. Record the base state and changed files in the experiment notes.
 5. Run the experiment with output redirected to a log file:
-   - ``<run command> > run.log 2>&1``
+   - ``<run command using exp/<experiment-name>/ paths> > exp/<experiment-name>/run.log 2>&1``
 6. Extract the primary metric and key runtime stats.
 7. If the run crashed or produced invalid results:
    - inspect the tail of the log
@@ -295,50 +320,51 @@ LOOP FOREVER:
    - retry only if the fix is small and the experiment idea still makes sense
 8. Record the result in `autoexp_results.tsv`.
 9. If the primary metric improved (and secondary constraints are met):
-   - keep the commit
+   - promote the minimal winning changes back into the canonical repo files
+   - rerun the canonical entrypoint to verify the promoted state
    - mark status `keep`
-   - advance from this commit
+   - make the promoted canonical files the new best state
 10. If the result is worse, equal, invalid, or too costly:
     - mark status `discard` or failure status
-    - revert to the prior best commit
+    - leave the canonical files unchanged
 11. Repeat until the budget, search space, or improvement potential is exhausted.
 
 ### For extension goals (C)
 
 FOR EACH setting IN the settings grid:
 
-1. Create a new branch for this setting (`exp/<setting-name>`) from the current state.
-2. Configure the pipeline for this setting.
-3. Commit configuration changes.
-3. Run the experiment.
-4. Extract metrics.
-5. Record in `autoexp_results.tsv` with the `setting` column filled.
-6. Flag any anomalous results for user attention.
-7. Do NOT discard — all runs are kept for analysis.
-8. Proceed to next setting.
+1. Create an isolated workspace for this setting (`exp/<setting-name>/`) from the current canonical files.
+2. Configure the copied pipeline files for this setting.
+3. Keep the setting-specific changes inside the `exp/<setting-name>/` workspace unless the user asks to make them canonical.
+4. Run the experiment.
+5. Extract metrics.
+6. Record in `autoexp_results.tsv` with the `setting` column filled.
+7. Flag any anomalous results for user attention.
+8. Do NOT discard — all runs are kept for analysis.
+9. Proceed to next setting.
 
 ### For reproduction goals (F)
 
 FOR EACH claim IN the claims list:
 
-1. Create a new branch for this claim (`exp/reproduce-<claim-ref>`) from the current state.
-2. Configure the pipeline to match the paper's setup for this claim.
+1. Create an isolated workspace for this claim (`exp/reproduce-<claim-ref>/`) from the current canonical files.
+2. Configure the copied pipeline files to match the paper's setup for this claim.
 3. Run the experiment.
-3. Extract the relevant metric.
-4. Compare to the expected value from the paper.
-5. Record in `autoexp_results.tsv` with `reference`, `expected`, `actual` columns.
-6. Mark `match` if within reasonable tolerance, `mismatch` otherwise.
-7. For mismatches, investigate and document possible causes.
+4. Extract the relevant metric.
+5. Compare to the expected value from the paper.
+6. Record in `autoexp_results.tsv` with `reference`, `expected`, `actual` columns.
+7. Mark `match` if within reasonable tolerance, `mismatch` otherwise.
+8. For mismatches, investigate and document possible causes.
 
 ### For modification goals (D, E)
 
 1. Present the proposed modification to the user before implementing.
-2. Create a new branch for this modification (`exp/<modification-name>`) from the current state.
-3. Implement the modification in a separate commit from any runs.
-3. Run baseline (original methodology) for comparison.
-4. Run modified experiment.
-5. Record both results.
-6. Analyze the difference and report findings.
+2. Create an isolated workspace for this modification (`exp/<modification-name>/`) from the current canonical files.
+3. Implement the modification in copied files inside that workspace before any runs.
+4. Run baseline (original methodology) for comparison.
+5. Run modified experiment.
+6. Record both results.
+7. Analyze the difference and report findings.
 
 ## Failure handling
 
@@ -358,21 +384,22 @@ Crash handling:
 - small typo/import/config mistakes may be fixed and retried
 - fundamentally bad ideas should be logged and skipped
 
-## Branching and reproducibility
+## Experiment isolation and reproducibility
 
-Each distinct experiment type or goal must run on its own branch. Create the branch before the first run and do all work for that experiment on it.
+Each distinct experiment type or goal must run in its own filesystem workspace under `exp/`. Create the workspace before the first run and do all exploratory edits inside it.
 
-Branch naming:
+Workspace naming:
 - `exp/<goal-short-name>` — e.g. `exp/lr-sweep`, `exp/extend-llama-models`, `exp/reproduce-table2`
-- If multiple experiments share the same goal type but test different ideas, use sub-branches: `exp/opt-lr`, `exp/opt-batch-size`, etc.
+- If multiple experiments share the same goal type but test different ideas, use separate workspaces: `exp/opt-lr`, `exp/opt-batch-size`, etc.
 
 Rules:
-- Create a new branch from the current best state (usually `main`) before starting a new experiment
-- Keep all commits for that experiment on its branch
-- Do not mix unrelated experiments on the same branch
-- Preserve the best known state on each branch
-- Avoid untracked modifications except logs/artifacts explicitly allowed
-- When an optimization experiment is `keep`, its branch becomes the new best state — merge it back or branch from it for the next experiment
+- Copy only the files/folders needed to run the experiment into the workspace
+- Do not mix unrelated experiments in the same workspace
+- Keep a short `exp/<experiment-name>/README.md` or notes entry describing what was copied, what changed, and how to run it
+- Preserve the canonical repo files as the best known state until a variant is promoted
+- Avoid modifying benchmark data, evaluation targets, or unrelated infrastructure in either canonical files or experiment workspaces
+- When an optimization experiment is `keep`, promote the minimal winning changes into the canonical files and rerun the canonical entrypoint before treating it as the new best state
+- Do not create Git branches by default; use Git only to identify the base canonical commit/state unless the user explicitly asks for branches
 
 ## Final instruction to the agent
 

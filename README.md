@@ -34,6 +34,7 @@ What it does under the hood:
 - Your coding agent will read `autoexp_program.md` and understand the research context and your goal.
 - It will run the baseline experiment and record the results in `autoexp_results.tsv`.
 - It will then iteratively run experiments appropriate to your goal — optimizing, extending, reproducing, or exploring as specified.
+- New ideas are isolated in filesystem workspaces such as `exp/lr-sweep/` or `exp/reproduce-table2/` by copying the relevant scripts/configs there. If a variant wins, the agent can promote it back into the canonical repo files or combine it with other winners deliberately.
 
 ## Customization
 

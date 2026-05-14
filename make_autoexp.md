@@ -98,7 +98,7 @@ Follow the template closely — it was designed for this case. Key sections:
 - Define what changes and what stays fixed
 - Baseline = run the original experiment for comparison
 - Primary metric = depends on the modification (may be a new metric the user defines)
-- The agent should commit the modification separately from runs, so it can be reviewed
+- The agent should implement the modification first inside an isolated `exp/<modification-name>/` workspace, so it can be reviewed and compared before any canonical files change
 
 #### Goal E: Future research
 - The agent should extract the specific future work suggestions from the paper
@@ -129,6 +129,8 @@ The report should be a concise, research-paper-style experiment overview with se
 - If the repo uses configs, specify which keys are tunable for this goal
 - If no explicit time budget exists, define a practical per-run budget based on existing structure
 - If the repo includes benchmark/eval harness files, treat them as read-only unless the selected goal explicitly requires changing them
+- Define an experiment workspace strategy under `exp/`: copy or replicate only the scripts/config folders needed for each idea, run the variant from that isolated path, and promote winning changes back to the canonical repo files only after they are validated
+- Do not use Git branches as the default isolation mechanism; keep Git as provenance only unless the user explicitly asks for branch-based experiments
 - If some details are ambiguous, document assumptions instead of leaving placeholders
 
 ### Requirements for the generated `autoexp_program.md`
@@ -139,6 +141,7 @@ The report should be a concise, research-paper-style experiment overview with se
 - It must specify how to log results into `autoexp_results.tsv`
 - It must define the primary metric and any secondary constraints
 - It must explain what the agent can and cannot modify
+- It must specify exactly which files/folders should be copied into `exp/<experiment-name>/` for each run, and how a winning variant is promoted back into the main implementation
 - It must preserve the integrity of whatever the experiment measures
 - It must avoid adding dependencies unless already supported
 - It must prefer small, attributable experiments over chaotic rewrites
